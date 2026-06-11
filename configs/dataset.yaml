@@ -1,0 +1,44 @@
+dataset_name: porto
+
+
+variants_base_dir: data/variants
+
+# =========================
+# 原始数据
+# =========================
+
+raw_csv: data/raw/porto/train.csv
+
+
+porto_raw_sample_size: 200000
+
+
+sampling_interval_sec: 15
+segment_time_mode: fixed_interval_from_trip_start
+
+# =========================
+# 公共路网与缓存（公共资源，不随数据规模变化）
+# =========================
+
+road_graph_path: data/intermediate/road_network/porto.graphml
+distance_cache_path: data/intermediate/road_network/porto_distance_cache.json
+successor_cache_path: data/intermediate/road_network/porto_successor_cache.json
+
+# =========================
+# 划分与预处理
+# =========================
+
+train_ratio: 0.8
+valid_ratio: 0.1
+test_ratio: 0.1
+split_seed: 42
+
+drop_missing_data: true
+min_points_per_traj: 10
+max_points_per_traj_before_map_matching: 200
+
+
+download_osm_if_missing: true
+osm_place_name: "Porto, Portugal"
+map_matching_method: simple_nearest_or_hmm
+deduplicate_consecutive_segments: true
