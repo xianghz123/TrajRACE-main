@@ -1,0 +1,327 @@
+# ============================================================
+# TrajRACE Canonical Experiment Configuration
+#
+# Single source of truth for:
+#   - SBS construction
+#   - risk scoring
+#   - privacy-budget allocation
+#   - adaptive bucket scheduling
+#   - server-side recovery
+#   - synthesis
+#   - rebuttal reproducibility
+#   - common evaluation
+#
+# Dataset/raw-road-network settings are defined in:
+#   configs/dataset.yaml
+# ============================================================
+
+experiment_name: trajrace_canonical_rebuttal_v1
+experiment_config_version: canonical_rebuttal_v1
+
+methods:
+  - riskaware
+  - uniform
+
+
+# ============================================================
+# 1. Formal privacy scope metadata
+# ============================================================
+
+# This field records the formal scope used by the implementation
+# and audit. It does NOT replace the mathematical proof.
+#
+# Public context:
+#   U = current road segment.
+#
+# Protected value:
+#   V = true successor in the public legal-successor domain N(U).
+privacy_scope: conditional_event_level_successor
+
+# B is used by the adaptive SBS reporting scheduler.
+# It is NOT, by itself, a claim of arbitrary complete-trajectory
+# B-LDP.
+B_semantics: sbs_reporting_schedule_cap
+
+
+# ============================================================
+# 2. Segment-Bounded Subtrajectory (SBS)
+# ============================================================
+
+# Public maximum number of road segments in one SBS.
+L_max: 30
+
+# Adjacent SBSs share one boundary road segment so that every
+# original transition is assigned to exactly one SBS.
+sbs_partition_mode: transition_preserving_overlap
+
+preserve_all_mapped_segments: true
+
+# Derived value:
+# max_transitions_per_sbs = L_max - 1.
+max_transitions_per_sbs: 29
+
+# cnt_j = exact number of road segments in SBS S_j.
+count_mode: exact_num_segments
+
+count_domain_min: 1
+count_domain_max: 30
+
+
+# ============================================================
+# 3. Public LDP domains
+# ============================================================
+
+# Public start domain derived from the fixed public road graph
+# and public admission rule, never from raw private starts.
+start_domain_mode: public_road_segments
+
+# Public count domain C = {1, ..., L_max}.
+count_domain_mode: public_exact_count
+
+# Public conditional successor domain N(u).
+successor_domain_mode: public_legal_successors
+
+# A private value is never appended to an LDP domain at runtime.
+allow_secret_dependent_domain_expansion: false
+
+
+# ============================================================
+# 4. Risk-aware scoring
+# ============================================================
+
+# r_i = lambda_e * r_i^e
+#     + lambda_s * r_i^s
+#     + lambda_d * r_i^d
+lambda_e: 0.3333333333
+lambda_s: 0.3333333333
+lambda_d: 0.3333333334
+
+# Endpoint-proximity road-network distance decay.
+sigma_e: 3.0
+
+# Long-stay-association road-network distance decay.
+sigma_st: 3.0
+
+# Delta_st in seconds.
+delta_st_sec: 300
+
+# Endpoint and long-stay components use public road-network
+# shortest-path distance.
+distance_mode: road_network_shortest_path
+
+# d(a,b) is measured as the shortest number of legal
+# road-segment transitions in the public road network.
+road_distance_definition: symmetric_shortest_segment_hops
+
+# Bucket selection is entirely local and uses fixed PUBLIC
+# thresholds chosen before accessing private risk distributions.
+bucket_mapping_mode: fixed_public_thresholds
+
+K: 3
+
+# Bucket 1 = strongest protection = smallest epsilon.
+theta_list:
+  - 0.67
+  - 0.34
+
+# Mapping:
+#   r >= 0.67          -> bucket 1
+#   0.34 <= r < 0.67  -> bucket 2
+#   r < 0.34           -> bucket 3
+
+
+# ============================================================
+# 5. Privacy-budget profiles
+# ============================================================
+
+# The active profile used by a single run.
+# run_rebuttal_experiments.py may override it explicitly.
+active_budget_profile: B1p0
+
+default_budget_profile: B1p0
+
+privacy_profiles:
+
+  B0p5:
+    B: 0.5
+
+    # Canonical rebuttal/revision allocation obtained by
+    # proportional scaling of the original B1p0 profile.
+    profile_origin: canonical_proportional_rerun
+
+    eps_start: 0.050
+    eps_count: 0.100
+    eps_bucket: 0.0025
+
+    eps_event_list:
+      - 0.0050
+      - 0.0125
+      - 0.0250
+
+
+  B1p0:
+    B: 1.0
+
+    # Existing official B=1.0 allocation used as the reference.
+    profile_origin: original_official_reference
+
+    eps_start: 0.100
+    eps_count: 0.200
+    eps_bucket: 0.0050
+
+    eps_event_list:
+      - 0.0100
+      - 0.0250
+      - 0.0500
+
+
+  B1p5:
+    B: 1.5
+
+    # Canonical rebuttal/revision allocation obtained by
+    # proportional scaling of the original B1p0 profile.
+    profile_origin: canonical_proportional_rerun
+
+    eps_start: 0.150
+    eps_count: 0.300
+    eps_bucket: 0.0075
+
+    eps_event_list:
+      - 0.0150
+      - 0.0375
+      - 0.0750
+
+
+# ============================================================
+# 6. Budget-feasible scheduling
+# ============================================================
+
+# epsilon_x^(k) = epsilon_e^(k) + epsilon_b.
+transition_cost_definition: event_plus_bucket
+
+# Preserve the minimum possible cost required by all future
+# transitions in the current SBS.
+reserve_future_minimum_cost: true
+
+# audit_privacy.py must fail if:
+#
+# B <
+#   eps_start
+# + eps_count
+# + (L_max - 1) * (min(eps_event_list) + eps_bucket)
+require_budget_feasibility_check: true
+
+# If the risk-target bucket is infeasible, select the closest
+# feasible bucket that provides no weaker protection.
+infeasible_target_policy: closest_feasible_no_weaker
+
+
+# ============================================================
+# 7. Local randomization
+# ============================================================
+
+start_mechanism: grr
+count_mechanism: grr
+
+# Submitted Eq. (13):
+# successor GRR consumes epsilon_e^(k).
+successor_mechanism: conditional_grr
+
+# Submitted Eq. (14):
+# noisy bucket report consumes epsilon_b.
+bucket_report_mechanism: grr
+
+
+# ============================================================
+# 8. Server-visible report schema
+# ============================================================
+
+# Transition report available to the untrusted server:
+#   (u, y, k_noisy)
+server_transition_fields:
+  - u
+  - y
+  - k_noisy
+
+shuffle_transition_reports: true
+
+include_user_id_in_server_reports: false
+include_trajectory_id_in_server_reports: false
+include_sbs_id_in_server_reports: false
+include_event_order_in_server_reports: false
+
+include_true_successor_in_server_reports: false
+include_true_risk_in_server_reports: false
+include_true_bucket_in_server_reports: false
+
+# Debug data are local/evaluation-only and disabled in the
+# canonical main artifact unless explicitly enabled.
+save_debug_files: false
+
+
+# ============================================================
+# 9. Server-side recovery
+# ============================================================
+
+# Paper/default mode.
+recovery_mode: context_bucket_mixture
+
+tau_shrinkage: 20.0
+
+bucket_recovery_solver: constrained_least_squares
+
+use_global_backoff: true
+
+# R1 recovery audit:
+# measure I(K;V|U) and conditional total variation.
+enable_recovery_dependence_diagnostic: true
+
+# A joint P(V,K|U) recovery may be enabled later only if the
+# Recovery Gate shows that the context-mixture approximation is
+# materially inaccurate.
+enable_joint_recovery_candidate: true
+
+
+# ============================================================
+# 10. Synthetic-data generation
+# ============================================================
+
+synthetic_num_mode: match_test_size
+
+respect_public_road_successors: true
+
+random_seed: 42
+
+num_workers: 4
+
+
+# ============================================================
+# 11. Rebuttal reproducibility
+# ============================================================
+
+multiseed_values:
+  - 42
+  - 43
+  - 44
+  - 45
+  - 46
+
+rebuttal_budget_profiles:
+  - B0p5
+  - B1p0
+  - B1p5
+
+
+# ============================================================
+# 12. Shared evaluation protocol
+# ============================================================
+
+shared_grid_size: 6
+
+num_random_queries: 200
+
+evaluation_seed: 42
+
+require_same_real_subset: true
+
+require_same_synthetic_size: true

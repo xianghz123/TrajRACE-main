@@ -1,0 +1,117 @@
+# ============================================================
+# TrajRACE Canonical Dataset Configuration
+#
+# This file contains ONLY:
+#   - raw dataset settings
+#   - public road-network resources
+#   - map-matching settings
+#   - train/valid/test split settings
+#   - preprocessing settings
+#
+# Method/privacy/SBS/recovery/evaluation parameters are defined
+# in configs/exp_main.yaml.
+# ============================================================
+
+dataset_name: porto
+
+# Canonical dataset configuration version.
+dataset_config_version: canonical_rebuttal_v1
+
+# Root directory used by versioning_utils.py.
+variants_base_dir: data/variants
+
+
+# ============================================================
+# 1. Raw data
+# ============================================================
+
+raw_csv: data/raw/porto/train.csv
+
+# Canonical main-experiment raw sample size.
+# Scalability experiments may override this value explicitly.
+raw_sample_size: 100000
+
+
+# ============================================================
+# 2. Timestamp construction
+# ============================================================
+
+# Porto GPS points are sampled every 15 seconds.
+sampling_interval_sec: 15
+
+segment_time_mode: fixed_interval_from_trip_start
+
+
+# ============================================================
+# 3. Public road network and public caches
+# ============================================================
+
+# The road graph and all topology-derived caches are PUBLIC.
+road_graph_path: data/intermediate/road_network/porto.graphml
+
+distance_cache_path: data/intermediate/road_network/porto_distance_cache.json
+
+successor_cache_path: data/intermediate/road_network/porto_successor_cache.json
+
+# For reproducibility, the canonical artifact uses a fixed graph.
+# Do not silently download a potentially different OSM snapshot.
+download_osm_if_missing: false
+
+osm_place_name: "Porto, Portugal"
+
+# Canonical implementation:
+#   GPS point -> nearest road node
+#   -> shortest path between consecutive matched nodes
+#   -> directed road-segment sequence.
+map_matching_method: nearest_node_shortest_path
+
+
+# ============================================================
+# 4. Train / validation / test split
+# ============================================================
+
+train_ratio: 0.8
+valid_ratio: 0.1
+test_ratio: 0.1
+
+split_seed: 42
+
+
+# ============================================================
+# 5. Raw-trajectory preprocessing
+# ============================================================
+
+drop_missing_data: true
+
+min_points_per_traj: 10
+
+# null means that long raw trajectories are NOT discarded merely
+# because they contain many GPS points.
+max_points_per_traj_before_map_matching: null
+
+# Optional public preprocessing downsampling.
+# Disabled in the canonical main experiment.
+enable_point_downsample_before_map_matching: false
+
+max_points_after_downsample_before_map_matching: null
+
+
+# ============================================================
+# 6. Mapped-trajectory admission
+# ============================================================
+
+# A mapped trajectory must contain at least one transition.
+min_segments_per_traj: 2
+
+deduplicate_consecutive_segments: true
+
+# IMPORTANT:
+# Preserve the complete mapped road-segment sequence.
+# L_m is NOT applied here.
+# SBS construction is performed later in build_events.py.
+preserve_full_mapped_trajectory: true
+
+truncate_mapped_trajectory: false
+
+# Failed map matching is explicitly counted and discarded.
+map_matching_failure_policy: drop_trajectory
