@@ -78,17 +78,16 @@ python scripts/run_rebuttal_experiments.py \
   --exp_config configs/exp_main.yaml \
   --mode single
 ```
-For a small smoke test:
+For the multi-budget and multi-seed experiments configured in `configs/exp_main.yaml`, run:
 ```bash
 python scripts/run_rebuttal_experiments.py \
   --dataset_config configs/dataset.yaml \
   --exp_config configs/exp_main.yaml \
-  --mode single \
-  --raw_sample_size_override 200
+  --mode grid
 ```
 Pipeline Description
 `preprocess_dataset.py`: preprocesses raw GPS trajectories, performs map matching, and produces complete road-segment trajectories.
-`build_events.py`: decomposes long trajectories into SBSs and extracts start, exact segment-count, and transition events.
+`build_events.py`: decomposes long trajectories into segment-bounded subtrajectories (SBSs) and extracts start, exact segment-count, and transition events.
 `compute_transition_risk.py`: computes transition-level endpoint, long-stay, and low-degree risks and assigns fixed risk buckets.
 `privatize_riskaware.py`: applies the proposed risk-aware local perturbation mechanism.
 `audit_privacy.py`: checks public domains, report schemas, budget feasibility, and the implemented privacy conditions.
@@ -97,7 +96,7 @@ Pipeline Description
 `recover_uniform_statistics.py`: recovers statistics from the uniform reports.
 `synthesize_trajectories.py`: generates synthetic road-network trajectories from the recovered statistics.
 `evaluate_compare.py`: compares risk-aware and uniform mechanisms and evaluates the generated trajectories.
-`run_rebuttal_experiments.py`: provides a reproducible entry point for single runs and multi-budget/multi-seed rebuttal experiments.
+`run_rebuttal_experiments.py`: provides a reproducible entry point for the complete experimental pipeline and multi-budget/multi-seed experiments.
 Outputs
 Outputs are stored under a versioned directory of the form:
 ```text
@@ -119,9 +118,10 @@ audits/
 The evaluation results include metrics such as transition JS divergence, synthetic bigram JS divergence, exact segment-count preservation, public-road legality, and risk-aware versus uniform protection statistics.
 Notes
 The road network and legal successor sets are treated as public information.
-For transition perturbation, the current road segment is public context and the true successor is the protected value.
+For transition perturbation, the current road segment is treated as public context and the true successor is the protected value.
 The privacy audit should finish with `OVERALL STATUS = PASS` and `Hard failures = 0`.
-`B` is used as the SBS adaptive reporting-schedule cap in the current artifact.
+`B` is used as the SBS adaptive reporting-schedule cap in the current implementation.
 Files generated with `--save_debug` may contain private truth for local debugging and should not be distributed as server-visible reports.
-The 200-trajectory smoke test is only for checking correctness and reproducibility; paper-scale results should use the full experimental settings.
-Raw preprocessing and map matching can be time-consuming and are separate from the method-specific runtime reported after common preprocessing.
+Raw datasets, large intermediate files, logs, and dataset-specific external resources are not included in this repository.
+Please make sure that all paths in the YAML configuration files are correctly set before running the pipeline.
+Raw preprocessing and map matching can be time-consuming and are separate from the method-specific runtime measured after common preprocessing.
